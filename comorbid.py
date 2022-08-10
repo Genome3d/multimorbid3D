@@ -111,7 +111,7 @@ def parse_args():
         '--ld', action='store_true', default=False,
         help='Include LD SNPs in identifying eQTLs and GWAS traits. Default = False')
     parser.add_argument(
-        '-c', '--correlation-threshold', default=0.8, type=int,
+        '-c', '--correlation-threshold', default=0.8, type=float,
         help='The r-squared correlation threshold to use.')
     parser.add_argument(
         '-w', '--window', default=5000, type=int,
