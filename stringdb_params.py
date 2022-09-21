@@ -1,4 +1,4 @@
-API_URL = "https://string-db.org/api"
+API_URL = "https://version-11-5.string-db.org/api"
 OUTPUT_FORMAT = "tsv"
 GET_IDS = "get_string_ids"
 INTERACTION_PARTNERS = "interaction_partners"
