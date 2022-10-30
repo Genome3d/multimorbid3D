@@ -1,18 +1,17 @@
 #! /usr/bin/env python
 
 import pandas as pd
-#import stringdb
 import argparse
 import requests
+import json
 import sys
 import os
 import stringdb_params as sdb
 from io import StringIO
 import time
-
 import logger
 
-def get_string_id(genes):
+def get_string_id(genes, sdb_version):
     ''' Get STRING IDs of a list of gene
     Returns a pandas DataFrame with columns, queryItem and stringId
     '''
@@ -21,7 +20,7 @@ def get_string_id(genes):
     gene_chunks = [genes[x:x+chunksize] for x in range(0, len(genes), chunksize)]
     for chunk in gene_chunks:
         params = sdb.get_params(chunk)
-        request_url = sdb.get_request_ids_url()
+        request_url = sdb.get_request_ids_url(sdb.get_stringapi_info(sdb_version)[0])
         res = requests.post(request_url, data=params)
         time.sleep(60)
         inp = StringIO(res.text.strip(), newline="\n")
@@ -35,8 +34,7 @@ def get_string_id(genes):
     except:
         return None
 
-
-def get_string_interaction_partners(genes, score_cutoff, level):
+def get_string_interaction_partners(genes, sdb_version, score_cutoff, level):
     ''' Get STRING IDs of a list of gene
     Returns a pandas DataFrame with columns, queryItem and stringId
     '''
@@ -45,7 +43,7 @@ def get_string_interaction_partners(genes, score_cutoff, level):
     gene_chunks = [genes[x:x+chunksize] for x in range(0, len(genes), chunksize)]
     for chunk in gene_chunks:
         params = sdb.get_params(chunk)
-        request_url = sdb.get_request_interaction_url()
+        request_url = sdb.get_request_interaction_url(sdb.get_stringapi_info(sdb_version)[0])
         try:
             res = requests.post(request_url, data=params)
             time.sleep(60)
@@ -71,14 +69,11 @@ def get_string_interaction_partners(genes, score_cutoff, level):
         'score': f'score_{level}'})
     return interactions
 
-
-def query_string(genes, score, level):
-    ids_df = get_string_id(genes)
+def query_string(genes, sdb_version, score, level):
+    ids_df = get_string_id(genes, sdb_version)
     if ids_df is None:
-        #sys.exit('EXIT No PPIN found for gene list.')
         return pd.DataFrame(columns=['geneA', 'geneB'])
-    df = get_string_interaction_partners(ids_df['stringId'].tolist(), score, level)
-
+    df = get_string_interaction_partners(ids_df['stringId'].tolist(), sdb_version, score, level)
     if df is None:
         return pd.DataFrame(columns=['geneA', 'geneB'])
     if df.empty:
@@ -117,13 +112,16 @@ def query_proper(genes, proper):
           )
     return df
 
-def make_ppin(gene_df, levels, output_dir, ppin_db, score, logger, bootstrap=False):
-    res = {}
+def make_ppin(gene_df, levels, output_dir, ppin_db, sdb_version, 
+        score, logger, bootstrap=False):
     graph = []
+    graph_filtered = []
     gene_list = [gene_df['gene'].drop_duplicates().tolist()]
-    for db in ppin_db:
-        res[db] = {}
-        if db == 'proper':
+    for level in range(1, levels + 1):
+        level_df = []
+        if ppin_db == 'string':
+            level_df.append(query_string(gene_list[level-1], sdb_version[0], score, level-1))
+        if ppin_db == 'proper':
             proper_fp = os.path.join(os.path.dirname(__file__), 'data/PROPER_v1.csv')
             proper = pd.read_csv(proper_fp).rename(columns={
                 'Cell line specificity': f'cell_line',
@@ -131,14 +129,7 @@ def make_ppin(gene_df, levels, output_dir, ppin_db, score, logger, bootstrap=Fal
                 'BH-corrected p-value': f'pval',
                 'Read count': 'read_count',
                 'Potential background contamination': 'background_contamination'})
-            res[db]['db'] = proper
-    for level in range(1, levels + 1):
-        level_df = []
-        for db in res:
-            if db == 'string':
-                level_df.append(query_string(gene_list[level-1], score, level-1))
-            if db == 'proper':
-                level_df.append(query_proper(gene_list[level-1], res[db]['db']))
+            level_df.append(query_proper(gene_list[level-1], proper))
         level_df = pd.concat(level_df)
         if level_df.empty:
             gene_list.append([])
@@ -148,13 +139,17 @@ def make_ppin(gene_df, levels, output_dir, ppin_db, score, logger, bootstrap=Fal
             graph.append(level_df)
         for i in range(len(gene_list)):
             level_df = level_df[~(level_df[f'geneB'].isin(gene_list[i]))]
+            graph_filtered.append(level_df)
         gene_list.append(level_df[f'geneB'].drop_duplicates().tolist())
     if not bootstrap:
         if len(graph) == 0:
             return gene_list, pd.DataFrame(columns=['geneA', 'geneB'])
         graph = pd.concat(graph)
+        graph_filtered = pd.concat(graph_filtered)
         write_results(graph.drop_duplicates(),
                       os.path.join(output_dir, 'graph.txt'))
+        write_results(graph_filtered.drop_duplicates(),
+                      os.path.join(output_dir, 'graph_filtered.txt'))
         del graph
     for level in range(len(gene_list)):
         write_results(pd.DataFrame({'gene': gene_list[level]}),

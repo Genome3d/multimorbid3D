@@ -13,11 +13,8 @@ import shutil
 import multiprocessing as mp
 from tqdm import tqdm
 from itertools import repeat
-
 import query_grn
 import ppin
-import query_string
-import query_proper
 import get_ppi_eqtls
 import find_snp_disease
 import logger
@@ -28,8 +25,6 @@ def write_results(df, output_fp, logger):
     os.makedirs(out_dir, exist_ok=True)
     logger.write('Writing output...')
     df.to_csv(output_fp, sep='\t', index=False)
-
-
 
 def parse_input(inputs):
     '''Return a dataframe of gene input.'''
@@ -43,10 +38,13 @@ def parse_input(inputs):
         df = df[['gene']].drop_duplicates()
     return df
 
+def get_stringdb_versions():
+    return sum(pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/string_api_urls.txt'),
+        sep='\t', usecols=['string_version']).values.tolist(), [])
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Identify multimorbid traits based on eQTL associations and protein-protein interactions.')
+        description='Identify multimorbid traits based on eQTL associations and protein-protein interactions.', formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         '-g', '--genes', nargs='+',
         help='''A space-separated list of gene symbols or filepath to a file 
@@ -79,10 +77,9 @@ def parse_args():
         '-l', '--levels', default=1, type=int,
         help='Path length (i.e. number of nodes) to query. Default = 1')
     parser.add_argument(
-        '-p', '--ppin', nargs='+', default=['string', 'proper'],
-        choices=['string', 'proper'],
+        '-p', '--ppin', default='string', choices=['string', 'proper'],
         help='''The protein-protein-interaction database(s) to use.
-        Default: ['string', 'proper']''')
+        Default: string''')
     parser.add_argument(
         '--string-score', default=0.7, type=float,
         help='Cut-off score for STRING interactions. Default = 0.7')
@@ -122,6 +119,10 @@ def parse_args():
     parser.add_argument(
         '--ld-dir', default=os.path.join(os.path.dirname(__file__), 'data/ld/dbs/super_pop/'),
         help='Directory containing LD database.')
+    parser.add_argument(
+        '--string-version', choices = get_stringdb_versions(), action='append',
+        help='''Use this flag to specify the version of STRING database to use. 
+        Available versions: '''+', '.join(get_stringdb_versions()) + '.', metavar='')
     return parser.parse_args()
 
 def parse_snps(snp_arg, trait_arg, pmid_arg, gwas, grn, output_dir,
@@ -173,7 +174,8 @@ def pipeline(genes, gwas, output_dir, args, logger, bootstrap=False):
     if not bootstrap:
         logger.write('Identifying protein interactions...')
     gene_list = ppin.make_ppin(
-        genes, args.levels, output_dir, args.ppin, args.string_score, logger, bootstrap=bootstrap)
+        genes, args.levels, output_dir, args.ppin, args.string_version, args.string_score, 
+        logger, bootstrap=bootstrap)
     if sum([len(level) for level in gene_list]) == 0:
         return pd.DataFrame()
     # PPIN eQTLs
@@ -208,7 +210,6 @@ def prep_bootstrap(sim, gene_num, sims_dir, res_dict, grn_genes, gwas, args):
                 res_dict[k] += 1
             except:
                 pass
-
             
 def bootstrap_genes(sig_res, genes, gwas, num_sims, grn, args):
     logger.write('Preparing simulations...')
@@ -279,12 +280,19 @@ if __name__=='__main__':
     start_time = time.time()
     if args.genes and (args.snps or args.trait or args.pmid):
         sys.exit('Only one of --genes, --snps, --trait, or --pmid is required.\nExiting.')
+    if args.ppin == 'string' and args.string_version is None:
+        sys.exit('\nMissing argument: --string-version. See "comorbid.y -h" for details.\nExiting.\n')
+    if args.string_version and args.ppin == 'proper':
+        sys.exit('\n--string-version can only be used when --ppin="string".\nExiting.\n')
     os.makedirs(args.output_dir, exist_ok=True)
     global logger
     logger = logger.Logger(logfile=os.path.join(args.output_dir, 'comorbid.log'))
     logger.write('SETTINGS\n========')
     for arg in vars(args):
         logger.write(f'{arg}:\t {getattr(args, arg)}')
+    if args.ppin == 'string' and args.string_version[0] == 'latest':
+        logger.write('STRINGdb version: {}'
+                .format(sdb.get_stringapi_info(args.string_version[0])[1]))
     logger.write('\n')
     grn = query_grn.parse_grn(args.grn_dir, logger)
     gwas = query_grn.parse_gwas(args.gwas, logger)
