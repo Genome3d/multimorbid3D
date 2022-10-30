@@ -49,9 +49,9 @@ For details on the expected inputs, run the `comorbid.py` script with `-h` argum
  
 ```
 (/m/p/u/s/multimorbid3D/multimorbid3D) :/mnt/projects/multimorbid3D$ python comorbid.py -h
-usage: comorbid.py [-h] [-g GENES [GENES ...]] [-s SNPS [SNPS ...]] [--trait TRAIT] [--pmid PMID] --grn-dir GRN_DIR [--gwas GWAS] -o OUTPUT_DIR [-l LEVELS] [-p {string,proper} [{string,proper} ...]]
+usage: comorbid.py [-h] [-g GENES [GENES ...]] [-s SNPS [SNPS ...]] [--trait TRAIT] [--pmid PMID] --grn-dir GRN_DIR [--gwas GWAS] -o OUTPUT_DIR [-l LEVELS] [-p {string,proper}]
                    [--string-score STRING_SCORE] [--bootstrap] [--bootstraps BOOTSTRAPS] [--keep-bootstraps] [--non-spatial] [--non-spatial-dir NON_SPATIAL_DIR] [--snp-ref-dir SNP_REF_DIR]
-                   [--gene-ref-dir GENE_REF_DIR] [--ld] [-c CORRELATION_THRESHOLD] [-w WINDOW] [--population {EUR}] [--ld-dir LD_DIR]
+                   [--gene-ref-dir GENE_REF_DIR] [--ld] [-c CORRELATION_THRESHOLD] [-w WINDOW] [--population {EUR}] [--ld-dir LD_DIR] [--string-version]
 
 Identify multimorbid traits based on eQTL associations and protein-protein interactions.
 
@@ -69,8 +69,8 @@ optional arguments:
                         Directory to write results.
   -l LEVELS, --levels LEVELS
                         Path length (i.e. number of nodes) to query. Default = 1
-  -p {string,proper} [{string,proper} ...], --ppin {string,proper} [{string,proper} ...]
-                        The protein-protein-interaction database(s) to use. Default: ['string', 'proper']
+  -p {string,proper}, --ppin {string,proper}
+                        The protein-protein-interaction database(s) to use. Default: string
   --string-score STRING_SCORE
                         Cut-off score for STRING interactions. Default = 0.7
   --bootstrap           Perform a bootstrap. Default = False
@@ -91,4 +91,5 @@ optional arguments:
                         The genomic window (+ or - in bases) within which proxies are searched. Default = 5000
   --population {EUR}    The ancestral population in which the LD is calculated. Default = "EUR"
   --ld-dir LD_DIR       Directory containing LD database.
+  --string-version      Use this flag to specify the version of STRING database to use. Available versions: latest, 11.5, 11.0b, 11.0, 10.5, 10.0.
 ```
