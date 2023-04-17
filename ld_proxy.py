@@ -51,7 +51,7 @@ def ld_proxy_chrom(chrom, query_snps, corr_thresh, window, pop, ld_dir):
                .drop(columns=['chromt_post', 'rsidt'])
                .rename(columns={'rsidt_res': 'rsidt'})
            )
-    chrom_dict[chrom] = snps[['chromq',	'posq', 'rsidq', 'chromt', 'post', 'rsidt', 'corr','dprime']]
+    chrom_dict[chrom] = snps[['chromq',	'posq', 'rsidq', 'chromt', 'post', 'rsidt', 'corr','dprime']] #TODO: write r2 to the file query_snp_ld.txt
 
 
 
@@ -211,7 +211,7 @@ def parse_args():
     parser.add_argument(
         '-o', '--output', required=True, help='Filepath to write results.')
     parser.add_argument(
-        '-c', '--correlation-threshold', default=0.8, type=int,
+        '-c', '--correlation-threshold', default=0.8, type=float,
         help='The r-squared correlation threshold to use. Default = 0.8')
     parser.add_argument(
         '-w', '--window', default=5000, type=int,
